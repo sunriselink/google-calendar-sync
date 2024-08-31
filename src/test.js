@@ -12,6 +12,7 @@ test('parse event', () => {
                 description: 'some description',
                 url: 'some url',
                 location: 'some location',
+                dtStart: null,
             },
         ],
     };

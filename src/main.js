@@ -247,7 +247,9 @@ const TOKEN_VALUE = {
 
 // Node.js debugging
 if (typeof module !== 'undefined') {
-    module.exports.ICSParser = ICSParser;
-    module.exports.ICSCalendar = ICSCalendar;
-    module.exports.ICSEvent = ICSEvent;
+    module.exports = {
+        ICSParser,
+        ICSCalendar,
+        ICSEvent,
+    };
 }
