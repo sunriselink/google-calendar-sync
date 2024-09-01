@@ -13,6 +13,7 @@ test('parse event', () => {
                 url: 'some url',
                 location: 'some location',
                 dtStart: null,
+                dtEnd: null,
             },
         ],
     };

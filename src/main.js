@@ -72,12 +72,13 @@ class ICSEventParser {
     event = new ICSEvent();
 
     parsers = {
-        [TOKEN_KEY.UID]: ICSEventParser.parseUID,
-        [TOKEN_KEY.SUMMARY]: ICSEventParser.parseSummary,
-        [TOKEN_KEY.DESCRIPTION]: ICSEventParser.parseDescriptions,
-        [TOKEN_KEY.URL]: ICSEventParser.parseUrl,
-        [TOKEN_KEY.LOCATION]: ICSEventParser.parseLocation,
-        [TOKEN_KEY.DTSTART]: ICSEventParser.parseDTStart,
+        [TOKEN_KEY.UID]: this.parseUID,
+        [TOKEN_KEY.SUMMARY]: this.parseSummary,
+        [TOKEN_KEY.DESCRIPTION]: this.parseDescriptions,
+        [TOKEN_KEY.URL]: this.parseUrl,
+        [TOKEN_KEY.LOCATION]: this.parseLocation,
+        [TOKEN_KEY.DTSTART]: this.parseDTStart,
+        [TOKEN_KEY.DTEND]: this.parseDTEnd,
     };
 
     /**
@@ -94,43 +95,50 @@ class ICSEventParser {
     /**
      * @param {ICSToken} token
      */
-    static parseUID(token) {
+    parseUID(token) {
         this.event.uid = token.value;
     }
 
     /**
      * @param {ICSToken} token
      */
-    static parseSummary(token) {
+    parseSummary(token) {
         this.event.summary = token.value;
     }
 
     /**
      * @param {ICSToken} token
      */
-    static parseDescriptions(token) {
+    parseDescriptions(token) {
         this.event.description = token.value;
     }
 
     /**
      * @param {ICSToken} token
      */
-    static parseUrl(token) {
+    parseUrl(token) {
         this.event.url = token.value;
     }
 
     /**
      * @param {ICSToken} token
      */
-    static parseLocation(token) {
+    parseLocation(token) {
         this.event.location = token.value;
     }
 
     /**
      * @param {ICSToken} token
      */
-    static parseDTStart(token) {
+    parseDTStart(token) {
         this.event.dtStart = ICSDateTimeParser.parseToken(token);
+    }
+
+    /**
+     * @param {ICSToken} token
+     */
+    parseDTEnd(token) {
+        this.event.dtEnd = ICSDateTimeParser.parseToken(token);
     }
 }
 
@@ -143,6 +151,36 @@ class ICSDateTimeParser {
         const dateTime = new ICSDateTime();
 
         dateTime.timezoneId = token.properties.get('TZID') || null;
+
+        /** @type {number[]} */
+        let dateParams;
+        let utc = false;
+
+        if (token.properties.get('VALUE') === 'DATE') {
+            const [_, year, month, day] = /^(\d{4})(\d{2})(\d{2})/.exec(token.value);
+            dateParams = [parseInt(year), parseInt(month) - 1, parseInt(day)];
+            dateTime.onlyDate = true;
+        } else {
+            const [_, year, month, day, hours, minutes, seconds, zeroTZ] =
+                /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(Z)?/.exec(token.value);
+
+            dateParams = [
+                parseInt(year),
+                parseInt(month) - 1,
+                parseInt(day),
+                parseInt(hours),
+                parseInt(minutes),
+                parseInt(seconds),
+            ];
+
+            utc = !!zeroTZ;
+        }
+
+        if (utc) {
+            dateTime.date = new Date(Date.UTC(...dateParams));
+        } else {
+            dateTime.date = new Date(...dateParams);
+        }
 
         return dateTime;
     }
@@ -185,13 +223,28 @@ class ICSEvent {
      * @type {ICSDateTime}
      */
     dtStart = null;
+
+    /**
+     * @type {ICSDateTime}
+     */
+    dtEnd = null;
 }
 
 class ICSDateTime {
     /**
      * @type {string}
      */
-    timezoneId;
+    timezoneId = null;
+
+    /**
+     * @type {Date}
+     */
+    date = null;
+
+    /**
+     * @type {boolean}
+     */
+    onlyDate = false;
 }
 
 class ICSToken {
@@ -239,6 +292,7 @@ const TOKEN_KEY = {
     URL: 'URL',
     LOCATION: 'LOCATION',
     DTSTART: 'DTSTART',
+    DTEND: 'DTEND',
 };
 
 const TOKEN_VALUE = {
