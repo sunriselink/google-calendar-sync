@@ -305,5 +305,6 @@ if (typeof module !== 'undefined') {
         ICSParser,
         ICSCalendar,
         ICSEvent,
+        ICSDateTime,
     };
 }
