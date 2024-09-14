@@ -29,7 +29,7 @@ function startSync() {
     Mutex.lock();
 
     for (const sourceCalendar of CONFIG.calendars) {
-        Logger.log(`Fetching ${sourceCalendar.name}...`);
+        Logger.log(`Fetching calendar "${sourceCalendar.name}" ...`);
 
         const calendar = CalendarUtils.fetchCalendar(sourceCalendar.name, sourceCalendar.icsUrl);
 
@@ -38,17 +38,12 @@ function startSync() {
 }
 
 class TriggerUtils {
-    /**
-     * @type {Array<Function>}
-     */
-    static allTriggers = [startSync];
-
     static createStartSyncTrigger() {
         ScriptApp.newTrigger(startSync.name).timeBased().everyMinutes(CONFIG.checkInterval).create();
     }
 
     static deleteTriggers() {
-        const allTriggers = this.allTriggers.map(x => x.name);
+        const allTriggers = [startSync].map(x => x.name);
         const projectTriggers = ScriptApp.getProjectTriggers();
 
         for (const trigger of projectTriggers) {
@@ -60,19 +55,17 @@ class TriggerUtils {
 }
 
 class Mutex {
-    static LAST_RUN = 'LAST_RUN';
-
     static lock() {
-        PropertiesService.getUserProperties().setProperty(this.LAST_RUN, `${Date.now()}`);
+        PropertiesService.getUserProperties().setProperty('LAST_RUN', `${Date.now()}`);
     }
 
     static isLocked() {
-        const lastRun = Number(PropertiesService.getUserProperties().getProperty(this.LAST_RUN) || 0);
+        const lastRun = Number(PropertiesService.getUserProperties().getProperty('LAST_RUN') || 0);
         return lastRun > 0 && lastRun < 360000;
     }
 
     static unlock() {
-        PropertiesService.getUserProperties().setProperty(this.LAST_RUN, '0');
+        PropertiesService.getUserProperties().setProperty('LAST_RUN', '0');
     }
 }
 
@@ -97,6 +90,8 @@ class ICSCalendarParser {
      * @returns {ICSCalendar}
      */
     static parseCalendar(name, icsCalendarRaw) {
+        icsCalendarRaw = icsCalendarRaw.trim();
+
         if (!this.validate(icsCalendarRaw)) {
             throw new Error('Incorrect ICS data');
         }
@@ -180,17 +175,19 @@ class ICSCalendarParser {
 }
 
 class ICSEventParser {
-    event = new ICSEvent();
+    constructor() {
+        this.event = new ICSEvent();
 
-    parsers = {
-        [TOKEN_KEY.UID]: this.parseUID,
-        [TOKEN_KEY.SUMMARY]: this.parseSummary,
-        [TOKEN_KEY.DESCRIPTION]: this.parseDescriptions,
-        [TOKEN_KEY.URL]: this.parseUrl,
-        [TOKEN_KEY.LOCATION]: this.parseLocation,
-        [TOKEN_KEY.DTSTART]: this.parseDTStart,
-        [TOKEN_KEY.DTEND]: this.parseDTEnd,
-    };
+        this.parsers = {
+            [TOKEN_KEY.UID]: this.parseUID,
+            [TOKEN_KEY.SUMMARY]: this.parseSummary,
+            [TOKEN_KEY.DESCRIPTION]: this.parseDescriptions,
+            [TOKEN_KEY.URL]: this.parseUrl,
+            [TOKEN_KEY.LOCATION]: this.parseLocation,
+            [TOKEN_KEY.DTSTART]: this.parseDTStart,
+            [TOKEN_KEY.DTEND]: this.parseDTEnd,
+        };
+    }
 
     /**
      * @param {ICSToken} token
@@ -299,92 +296,66 @@ class ICSDateTimeParser {
 
 class ICSCalendar {
     /**
-     * @type {string}
-     */
-    name = null;
-
-    /**
-     * @type {ICSEvent[]}
-     */
-    events = [];
-
-    /**
      * @param {string} name
      */
     constructor(name) {
+        /** @type {string} */
         this.name = name;
+
+        /** @type {ICSEvent[]} */
+        this.events = [];
     }
 }
 
 class ICSEvent {
-    /**
-     * @type {string}
-     */
-    uid = null;
+    constructor() {
+        /** @type {string} */
+        this.uid = null;
 
-    /**
-     * @type {string}
-     */
-    summary = null;
+        /** @type {string} */
+        this.summary = null;
 
-    /**
-     * @type {string}
-     */
-    description = null;
+        /** @type {string} */
+        this.description = null;
 
-    /**
-     * @type {string}
-     */
-    url = null;
+        /** @type {string} */
+        this.url = null;
 
-    /**
-     * @type {string}
-     */
-    location = null;
+        /** @type {string} */
+        this.location = null;
 
-    /**
-     * @type {ICSDateTime}
-     */
-    dtStart = null;
+        /** @type {ICSDateTime} */
+        this.dtStart = null;
 
-    /**
-     * @type {ICSDateTime}
-     */
-    dtEnd = null;
+        /** @type {ICSDateTime} */
+        this.dtEnd = null;
+    }
 }
 
 class ICSDateTime {
-    /**
-     * @type {string}
-     */
-    timezoneId = null;
+    constructor() {
+        /** @type {string} */
+        this.timezoneId = null;
 
-    /**
-     * @type {Date}
-     */
-    date = null;
+        /** @type {Date} */
+        this.date = null;
 
-    /**
-     * @type {boolean}
-     */
-    onlyDate = false;
+        /** @type {boolean} */
+        this.onlyDate = false;
+    }
 }
 
 class ICSToken {
-    /**
-     * @type {string}
-     */
-    key;
+    constructor() {
+        /** @type {string} */
+        this.key;
 
-    /**
-     * @type {string}
-     */
-    value;
+        /** @type {string} */
+        this.value;
 
-    /**
-     * @type {Map<string, string>}
-     */
-    properties = new Map();
+        /** @type {Map<string, string>} */
+        this.properties = new Map();
+    }
 }
 
 const TOKEN_KEY = {
