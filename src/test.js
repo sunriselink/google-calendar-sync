@@ -1,4 +1,4 @@
-const { ICSParser, ICSEvent, ICSDateTime } = require('./main');
+const { ICSCalendarParser, ICSEvent, ICSDateTime } = require('./main');
 
 parseStringTest('uid', 'UID', e => e.uid);
 parseStringTest('summary', 'SUMMARY', e => e.summary);
@@ -87,7 +87,7 @@ function parseDateTimeTest(propertyName, icsToken, propertyGetter) {
  */
 function singleEvent(token) {
     const ics = ['BEGIN:VCALENDAR', 'BEGIN:VEVENT', token, 'END:VEVENT', 'END:VCALENDAR'].join('\n');
-    const calendar = ICSParser.parseCalendar(ics);
+    const calendar = ICSCalendarParser.parseCalendar('test', ics);
 
     return calendar.events[0];
 }

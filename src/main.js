@@ -1,34 +1,121 @@
-class ICSParser {
+const CONFIG = {
+    checkInterval: 10,
+    startDate: '2024-09-01',
+    calendars: [
+        {
+            name: 'Target calendar name',
+            icsUrl: 'iCal URL',
+        },
+    ],
+};
+
+function install() {
+    TriggerUtils.deleteTriggers();
+    TriggerUtils.createStartSyncTrigger();
+
+    startSync();
+}
+
+function uninstall() {
+    TriggerUtils.deleteTriggers();
+}
+
+function startSync() {
+    if (Mutex.isLocked()) {
+        Logger.log('Another iteration is currently running! Exiting...');
+        return;
+    }
+
+    Mutex.lock();
+
+    for (const sourceCalendar of CONFIG.calendars) {
+        Logger.log(`Fetching ${sourceCalendar.name}...`);
+
+        const calendar = CalendarUtils.fetchCalendar(sourceCalendar.name, sourceCalendar.icsUrl);
+
+        Logger.log(`Total events: ${calendar.events.length}`);
+    }
+}
+
+class TriggerUtils {
     /**
+     * @type {Array<Function>}
+     */
+    static allTriggers = [startSync];
+
+    static createStartSyncTrigger() {
+        ScriptApp.newTrigger(startSync.name).timeBased().everyMinutes(CONFIG.checkInterval).create();
+    }
+
+    static deleteTriggers() {
+        const allTriggers = this.allTriggers.map(x => x.name);
+        const projectTriggers = ScriptApp.getProjectTriggers();
+
+        for (const trigger of projectTriggers) {
+            if (allTriggers.includes(trigger.getHandlerFunction())) {
+                ScriptApp.deleteTrigger(trigger);
+            }
+        }
+    }
+}
+
+class Mutex {
+    static LAST_RUN = 'LAST_RUN';
+
+    static lock() {
+        PropertiesService.getUserProperties().setProperty(this.LAST_RUN, `${Date.now()}`);
+    }
+
+    static isLocked() {
+        const lastRun = Number(PropertiesService.getUserProperties().getProperty(this.LAST_RUN) || 0);
+        return lastRun > 0 && lastRun < 360000;
+    }
+
+    static unlock() {
+        PropertiesService.getUserProperties().setProperty(this.LAST_RUN, '0');
+    }
+}
+
+class CalendarUtils {
+    /**
+     * @param {string} name
+     * @param {string} url
+     * @returns {ICSCalendar}
+     */
+    static fetchCalendar(name, url) {
+        const response = UrlFetchApp.fetch(url);
+        const icsContent = response.getContentText();
+
+        return ICSCalendarParser.parseCalendar(name, icsContent);
+    }
+}
+
+class ICSCalendarParser {
+    /**
+     * @param {string} name
      * @param {string} icsCalendarRaw
      * @returns {ICSCalendar}
      */
-    static parseCalendar(icsCalendarRaw) {
-        const calendar = new ICSCalendar();
+    static parseCalendar(name, icsCalendarRaw) {
+        if (!this.validate(icsCalendarRaw)) {
+            throw new Error('Incorrect ICS data');
+        }
+
+        const calendar = new ICSCalendar(name);
 
         let eventParser = null;
 
-        for (const tokenRaw of splitLines(icsCalendarRaw)) {
-            const token = ICSParser.parseToken(tokenRaw);
+        for (const tokenRaw of this.splitLines(icsCalendarRaw)) {
+            const token = ICSCalendarParser.parseToken(tokenRaw);
 
-            switch (token.key) {
-                case TOKEN_KEY.BEGIN: {
-                    switch (token.value) {
-                        case TOKEN_VALUE.VEVENT:
-                            eventParser = new ICSEventParser();
-                            break;
-                    }
-
+            switch (true) {
+                case token.key === TOKEN_KEY.BEGIN && token.value === TOKEN_VALUE.VEVENT: {
+                    eventParser = new ICSEventParser();
                     break;
                 }
-                case TOKEN_KEY.END: {
-                    switch (token.value) {
-                        case TOKEN_VALUE.VEVENT:
-                            calendar.events.push(eventParser.event);
-                            eventParser = null;
-                            break;
-                    }
-
+                case token.key === TOKEN_KEY.END && token.value === TOKEN_VALUE.VEVENT: {
+                    calendar.events.push(eventParser.event);
+                    eventParser = null;
                     break;
                 }
                 default: {
@@ -65,6 +152,30 @@ class ICSParser {
         }
 
         return token;
+    }
+
+    /**
+     * @param {string} raw
+     * @returns {string}
+     */
+    static splitLines(raw) {
+        return raw.split(/\r?\n/).reduce((acc, cur) => {
+            if (cur.startsWith(' ')) {
+                acc[acc.length - 1] += cur.slice(1);
+            } else {
+                acc.push(cur);
+            }
+
+            return acc;
+        }, []);
+    }
+
+    /**
+     * @param {string} icsCalendarRaw
+     * @returns {boolean}
+     */
+    static validate(icsCalendarRaw) {
+        return /^BEGIN:VCALENDAR.*END:VCALENDAR$/s.test(icsCalendarRaw);
     }
 }
 
@@ -188,9 +299,21 @@ class ICSDateTimeParser {
 
 class ICSCalendar {
     /**
+     * @type {string}
+     */
+    name = null;
+
+    /**
      * @type {ICSEvent[]}
      */
     events = [];
+
+    /**
+     * @param {string} name
+     */
+    constructor(name) {
+        this.name = name;
+    }
 }
 
 class ICSEvent {
@@ -264,25 +387,6 @@ class ICSToken {
     properties = new Map();
 }
 
-/**
- * @param {string} raw
- * @returns {string}
- */
-function splitLines(raw) {
-    return raw
-        .trim()
-        .split(/\r?\n/)
-        .reduce((acc, cur) => {
-            if (cur.startsWith(' ')) {
-                acc[acc.length - 1] += cur.slice(1);
-            } else {
-                acc.push(cur);
-            }
-
-            return acc;
-        }, []);
-}
-
 const TOKEN_KEY = {
     BEGIN: 'BEGIN',
     END: 'END',
@@ -302,7 +406,7 @@ const TOKEN_VALUE = {
 // Node.js debugging
 if (typeof module !== 'undefined') {
     module.exports = {
-        ICSParser,
+        ICSCalendarParser,
         ICSCalendar,
         ICSEvent,
         ICSDateTime,
