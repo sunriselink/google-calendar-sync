@@ -6,8 +6,8 @@ parseStringTest('description', 'DESCRIPTION', e => e.description);
 parseStringTest('url', 'URL', e => e.url);
 parseStringTest('location', 'LOCATION', e => e.location);
 
-parseDateTimeTest('dtStart', 'DTSTART', e => e.dtStart);
-parseDateTimeTest('dtEnd', 'DTEND', e => e.dtEnd);
+parseDateTimeTest('startDate', 'DTSTART', e => e.startDate);
+parseDateTimeTest('endDate', 'DTEND', e => e.endDate);
 
 /**
  * @param {string} propertyName
